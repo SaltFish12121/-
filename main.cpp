@@ -4,11 +4,12 @@
 
 #define MemoryPageNumber 3 	// 最多允许的内存页面 
 #define MemoryHistorySize 100 // 假设我们最多记录100次分配历史
+#define ProcessNumber 6	// 进程数量 
 
 // 作业结构体
 typedef struct Task{ 
     // 作业名
-    char process_name[5];    
+    char process_name[ProcessNumber];    
     // 到达时间
     int arrive_time;
     // 新增优先级字段
@@ -24,9 +25,6 @@ typedef struct Task{
     int instruction_number;
     // 页表号 
     int table_number; 
-
-//    // 后向指针
-//    Task *next; 
 }Task; 
 
 // 页表结构
@@ -44,19 +42,20 @@ typedef struct MemoryPage{
 	// 块号 
 	int block_number;
 	// 指令名称 
-	char instruction_name[10];
+	char instruction_name[20];
 	// 阻塞时间 
 	int block_time;
 }MemoryPage;
 
 
 // 创建五个进程的数组
-Task tasks[5] = {
-    {"T1", 0, 9, 13, 'R', 0, 13, 1},
+Task tasks[ProcessNumber] = {
+    {"T1", 0, 19, 13, 'R', 0, 13, 1},
     {"T2", 1, 34, 8, 'R', 0, 8, 2},
     {"T3", 2, 30, 14, 'R', 0, 14, 3},
     {"T4", 3, 29, 11, 'R', 0, 11, 4},
-    {"T5", 4, 10, 12, 'R', 0, 12, 5}
+    {"T5", 4, 10, 12, 'R', 0, 12, 5},
+		{"T6", 5, 17, 10, 'R', 0, 10, 6} 
 };
 
 
@@ -134,49 +133,62 @@ PageTable pageTable5[12] = {
 		{2,2,false}
 }; 
 
+PageTable pageTable6[10] = {
+		{1,1,false},
+		{3,1,false},
+		{2,1,false},
+		{5,1,false},
+		{9,1,false},
+		{7,1,false},
+		{8,1,false},
+		{9,1,false},
+		{1,2,false},
+		{2,2,false}
+}; 
+
 // 十个页面 （模拟的内存物理块）
 MemoryPage page1[2] = {
-	{1, "11", 0},
-	{2, "12", 0},
+	{1, "读取内存11", 0},
+	{2, "写入内存12", 0},
 }; 
 
 MemoryPage page2[2] = {
-	{1, "21", 0},
-	{2, "22", 0},
+	{1, "等待输入21", 10},
+	{2, "结果输出22", 0},
 }; 
 
 MemoryPage page3[2] = {
-	{1, "31", 0},
-	{2, "32", 0},
+	{1, "读取内存31", 0},
+	{2, "读取内存32", 0},
 }; 
 
 MemoryPage page4[2] = {
-	{1, "41", 0},
-	{2, "42", 0},
+	{1, "写入内存41", 0},
+	{2, "读取内存42", 0},
 }; 
 
 MemoryPage page5[1] = {
-	{1, "51", 0}
+	{1, "等待输入51", 8}
 }; 
 
 MemoryPage page6[1] = {
-	{1, "61", 0}
+	{1, "结果输出61", 0}
 }; 
 
 MemoryPage page7[1] = {
-	{1, "71", 0}
+	{1, "读取内存71", 0}
 }; 
 
 MemoryPage page8[1] = {
-	{1, "81", 0}
+	{1, "读取内存81", 0}
 };
 
 MemoryPage page9[1] = {
-	{1, "91", 0}
+	{1, "写入内存91", 0}
 };
 
 MemoryPage page10[1] = {
-	{1, "101", 0}
+	{1, "读取内存101", 0}
 };
 
 
@@ -188,17 +200,21 @@ int current_time = 0;	// 当前时间
 // 全局数组，记录每个页面最后一次被访问的时间
 int last_used[10] = {0}; // 假设有10个页面
 
+// 全局数组，记录每个进程的阻塞时间
+int block_times[ProcessNumber] = {0}; // 假设有5个进程
+
+
 // 页表 
-PageTable *pageTables[5] = {pageTable1, pageTable2, pageTable3, pageTable4, pageTable5};
+PageTable *pageTables[ProcessNumber] = {pageTable1, pageTable2, pageTable3, pageTable4, pageTable5, pageTable6};
 	
 // 模拟内存物理块，存储：块号、指令名称、（如果可以阻塞，则给出阻塞时间)
 MemoryPage *pages[10] = {page1, page2, page3, page4, page5, page6, page7, page8, page9, page10};
 
-// 模拟进程执行指令
 
-// 处理缺页中断
-
-
+// 更新进程状态为阻塞，并设置阻塞时间
+void set_task_block_time(Task tasks[], int task_count, int task_index, int block_time);
+// 每个时间单位减少阻塞时间
+void decrease_block_time(Task tasks[]);
 // 更新任务优先级 
 void update_priority(Task tasks[], int task_count);
 // 找到优先级最高的任务
@@ -206,7 +222,7 @@ int find_highest_priority_task(Task tasks[], int task_count, int last_number);
 // 打印页表 
 void print_page_table(PageTable *pageTable, int pageTableSize); 
 // 模拟任务执行
-void simulate_task_execution(Task *task, int memory_size);
+void simulate_task_execution(Task *task, int memory_size, int task_index);
 // 页面置换 
 void page_replacement(int new_page, PageTable *pageTable, int index);
 
@@ -214,12 +230,8 @@ void page_replacement(int new_page, PageTable *pageTable, int index);
 void print_task_status(Task tasks[], int task_count);
 // 打印页面状态
 void print_page_status(MemoryPage *pages[], int memory_size);
-// 更新最后使用时间
-//void update_last_used(MemoryPage *pages[], int memory_size, int *last_used[], int current_time);
 
 
-int find_lru_page(MemoryPage memory[][2], int size);
-void simulate_scheduling(Task tasks[], PageTable *pageTables[], int task_count, MemoryPage *pages[], int memory_size);
 
 
 // 抢占式动态优先级调度算法
@@ -228,26 +240,30 @@ void simulate_scheduling(Task tasks[], PageTable *pageTables[], int task_count, 
  * 修改成为LRU 
  */
 int main() {
-		int task_count = 5;
+		int task_count = ProcessNumber;
 	
 	  // 初始化最后使用时间数组
 	  int last_used[10] = {0}; // 假设有10个页面
 	  
 	  int memory_size = 10; // 假设有10个内存页面
 	  
-	  Task comeTasks[5] = {};	// 到达任务 
+	  Task comeTasks[ProcessNumber] = {};	// 到达任务 
 	 	int comeTask_count = 0; // 到达任务数
 		
 		int last_number= -1; // 上一次最高优先级 
 		
 		// 等待区(按到达顺序） 
-		Task awaitTasks[5] = {
-		    {"T1", 0, 9, 13, 'R', 0, 13, 1},
-		    {"T2", 1, 34, 8, 'R', 0, 8, 2},
-		    {"T3", 2, 30, 14, 'R', 0, 14, 3},
-		    {"T4", 3, 29, 11, 'R', 0, 11, 4},
-		    {"T5", 4, 10, 12, 'R', 0, 12, 5}
-		};
+		Task awaitTasks[ProcessNumber];
+		for (int i = 0; i < ProcessNumber; i++) {
+		    awaitTasks[i] = tasks[i];
+		}
+//		Task awaitTasks[5] = {
+//		    {"T1", 0, 9, 13, 'R', 0, 13, 1},
+//		    {"T2", 1, 34, 8, 'R', 0, 8, 2},
+//		    {"T3", 2, 30, 14, 'R', 0, 14, 3},
+//		    {"T4", 3, 29, 11, 'R', 0, 11, 4},
+//		    {"T5", 4, 10, 12, 'R', 0, 12, 5}
+//		};
 		
 		/*
 		主要修改 comeTasks和 awaitTasks
@@ -257,19 +273,27 @@ int main() {
 
     // 模拟操作系统运行
     while (1) {
+//    	  // 测试用
+//				if (current_time >= 200) {
+//					printf("强行结束\n");
+//					break;
+//				} 
+    	
 	   		// 存储到达的任务 
 	   		if (tasks[comeTask_count].arrive_time <= current_time && comeTask_count < task_count) {
 	   			// comeTasks进入 
 	   			comeTasks[comeTask_count] = tasks[comeTask_count];
-	   			printf("\t\t\t任务到达\n");
+	   			printf("\t\t\t\t任务到达\n");
 	   			printf("﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀\n");
 	   			printf("\t%s \t%c \t%d \t%d \t%d \t%d \t%d\n", 
 					 comeTasks[comeTask_count].process_name, comeTasks[comeTask_count].status, comeTasks[comeTask_count].arrive_time, 
 					 comeTasks[comeTask_count].priority, comeTasks[comeTask_count].need_time, comeTasks[comeTask_count].instruction_number, comeTasks[comeTask_count].table_number); 
-					printf("﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀\n");
+					printf("﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀\n\n");
 					comeTask_count +=1 ;
 				}
 
+        // 减少阻塞时间
+        decrease_block_time(comeTasks);
     	
         // 更新任务优先级
         update_priority(comeTasks, comeTask_count);
@@ -281,13 +305,16 @@ int main() {
         int highest_priority_index = find_highest_priority_task(comeTasks, comeTask_count, last_number);
         if (highest_priority_index == -1) {
             // 没有到达的任务，增加时间单位
+            // 执行时间
+						printf("\n\t\t执行时间:%d\n\n\n\n", current_time) ;\
+						printf("\n===========================================================================================================\n\n\n") ;
             current_time++;
             continue;
         }
         // 当前优先级最高的任务 
         Task *current_task = &comeTasks[highest_priority_index];
         last_number =  highest_priority_index;
-				printf("当前优先级最高的任务为： %s 优先级为：%d   执行该任务\n\n", current_task->process_name, current_task->priority);
+				printf("\n当前优先级最高的任务为： %s 优先级为：%d   执行该任务\n\n", current_task->process_name, current_task->priority);
 				printf("﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀\n");
 
     		// 找到对应的页表 
@@ -299,13 +326,8 @@ int main() {
 				
 				
         // 模拟任务执行(只执行一条) 
-        simulate_task_execution(current_task, memory_size);
-
-				// 打印需要时间
-				printf("需要时间:%d\n\n", current_task->need_time) ;
-
-//        // 打印当前页面状态
-//        print_page_status(pages, memory_size);
+        simulate_task_execution(current_task, memory_size, highest_priority_index);
+				
 
         // 检查任务是否完成
         if (current_task->need_time == 0) {
@@ -316,12 +338,12 @@ int main() {
             // 如果任务仍没有结束，则说明发生阻塞，更新最后使用时间
 //            update_last_used(pages, memory_size, last_used);
         }
-//
+
         // 检查是否所有任务都已完成
         int all_tasks_finished = 1;
         for (int i = 0; i < task_count; i++) {
             if (awaitTasks[i].status != 'F') {
-            		printf("未完成 %d %c \n", i+1, comeTasks[i].status); 
+//            		printf("未完成 %d %c \n", i+1, comeTasks[i].status); 
                 all_tasks_finished = 0;
                 break;
             }
@@ -332,17 +354,49 @@ int main() {
         }
 
         current_time++; // 更新时间片
-        
-        
-//        // 测试用
-//				if (current_time >= 200) {
-//					printf("强行结束\n");
-//					break;
-//				} 
+        // 执行时间
+				printf("\n\t\t执行时间:%d\n\n\n\n", current_time) ;
+      	printf("\n===========================================================================================================\n\n\n") ;
     }
 		
 		printf("完成!\n");
+		
+		
+		
     return 0;
+}
+
+
+// 判断任务是否处于阻塞状态
+int is_task_blocked(Task tasks[], int task_index) {
+    // 检查任务索引是否有效
+    if (task_index < 0 || task_index >= ProcessNumber) {
+        printf("任务索引无效。\n");
+        return 0; // 返回0表示任务未被阻塞（索引无效）
+    }
+    
+    // 检查任务的阻塞时间是否大于0
+    if (block_times[task_index] > 0) {
+        return 1; // 返回1表示任务被阻塞
+    }
+    
+    return 0; // 返回0表示任务未被阻塞
+}
+
+
+// 每个时间单位减少阻塞时间
+void decrease_block_time(Task tasks[]) {
+    for (int i = 0; i < ProcessNumber; i++) {
+        if (block_times[i] > 0) {
+        	printf("-------------------------------\n\t任务%d减少阻塞时间  原本%d\n-------------------------------\n", i+1, block_times[i]);
+            block_times[i]--; // 减少阻塞时间
+            if (block_times[i] == 0) {
+                // 如果阻塞时间结束，将进程状态设置为就绪
+                tasks[i].status = 'R';
+                block_times[i] = 0; // 重置阻塞时间为0
+            }
+        }
+    }
 }
 
 
@@ -377,8 +431,11 @@ void update_priority(Task tasks[], int task_count) {
 int find_highest_priority_task(Task tasks[], int task_count, int last_number) {
     int highest_priority_index = -1;
     int highest_priority = -1;
+    printf("\t   任务编号\t是否阻塞\n");
     for (int i = 0; i < task_count; i++) {
-        if (tasks[i].status != 'F' && tasks[i].priority > highest_priority) {
+    	  // 要排除阻塞的 
+    	  printf("阻塞情况\t%d \t%d\n", i+1, is_task_blocked(tasks, i));
+        if (tasks[i].status != 'F' && !is_task_blocked(tasks, i) && tasks[i].priority > highest_priority) {
             highest_priority = tasks[i].priority;
             highest_priority_index = i;
         }
@@ -392,6 +449,8 @@ int find_highest_priority_task(Task tasks[], int task_count, int last_number) {
     	printf("任务 %s   进入阻塞\n", tasks[last_number].process_name);
     	tasks[last_number].status = 'B';
 		} 
+		
+		printf("﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀\n");
     
     return highest_priority_index;
 }
@@ -412,7 +471,7 @@ void print_page_table(PageTable *pageTable, int pageTableSize) {
 
 
 //  模拟任务执行
-void simulate_task_execution(Task *task, int memory_size) {
+void simulate_task_execution(Task *task, int memory_size, int task_index) {
 		// 切换状态
 		task->status = 'W' ;
 	
@@ -439,11 +498,12 @@ void simulate_task_execution(Task *task, int memory_size) {
 		      
 		    if (!found) {
             // 页面未找到，发生缺页
-            printf("缺页中断：需要页面 %d\n", page_number);
+            printf("\n\t\t当前页面未找到，发生缺页中断，进行LRU：需要页面 %d\n\n", page_number);
 //            int current_time = i; // 假设当前时间是指令序号
             page_replacement(page_number, pageTable, i);
             
             // 打印当前Memory
+            printf("当前内存分配信息：\n"); 
 						for(int i=0;i<=current_history_index;i++) {
 							for(int j=0;j<MemoryPageNumber;j++) {
 								printf("\t%d",Memory[i][j]);
@@ -457,22 +517,28 @@ void simulate_task_execution(Task *task, int memory_size) {
         
         // 确保拥有页面，然后进行正常操作  
         printf("页号%d,物理块号%d\n", page_number, block_number);
+        
         // 按照页号和物理块号找寻指令
-//				printf("执行指令：%s, 阻塞时长：%d\n\n", pages[page_number-1][block_number-1].instruction_name, pages[page_number-1][block_number-1].block_time);
-		    
+        
+        // 是否发生阻塞 
 		    if (pages[page_number-1][block_number-1].block_time != 0) {
 		    	// 进入阻塞
-					printf("指令：%s 进入阻塞\n", pages[page_number-1][block_number-1].instruction_name);
+					printf("﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀\n\n指令：\t%s\t 进入阻塞\n\n﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀\n", 
+					pages[page_number-1][block_number-1].instruction_name);
+				
 					
-					// 减少已经阻塞时间 
-//					pages[page_number-1][block_number-1].block_time -=1 ; 
 
 					// 修改当前进程状态
 					task->status = 'B' ;
+//					task->block_time += 1;
 
-					// 进程切换
-					
-					
+					// 设置阻塞 
+					printf("阻塞\t%d\t%d\n", task_index, pages[page_number-1][block_number-1].block_time);
+					block_times[task_index] = pages[page_number-1][block_number-1].block_time; // 设置阻塞时间
+
+					// 减少已经阻塞时间 
+//					pages[page_number-1][block_number-1].block_time -= 1;
+					pages[page_number-1][block_number-1].block_time = 0;
 					
 					break;
 					 
@@ -480,10 +546,10 @@ void simulate_task_execution(Task *task, int memory_size) {
 		    
 		    task->need_time -=1 ;
 		    
-		    printf("执行指令：%s 完成\n", pages[page_number-1][block_number-1].instruction_name);
+		    printf("﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀\n\n执行指令：\t%s\t 完成\n\n﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀\n", pages[page_number-1][block_number-1].instruction_name);
 				pageTables[task->table_number - 1][i].ifFinsih = true;
 				
-				current_time += 1;
+//				current_time += 1;
 				break; 
 			}
 
@@ -538,7 +604,7 @@ void page_replacement(int new_page, PageTable *pageTable, int index) {
             printf("LRU页面置换：页面 %d 被替换为页面 %d\n", Memory[current_history_index][lru_index], new_page);
         } else {
             // 没有找到合适的页面进行置换，可能是因为内存已满且没有页面被使用过
-            printf("内存已满，无法进行页面置换\n");
+            printf("内存均可以使用\n");
         }
     } else {
         // 页面已在内存中，更新最后使用时间
@@ -549,15 +615,15 @@ void page_replacement(int new_page, PageTable *pageTable, int index) {
 
 // 打印任务状态
 void print_task_status(Task tasks[], int task_count) {
-		if (task_count > 5) {
-			task_count = 5;
+		if (task_count > ProcessNumber) {
+			task_count = ProcessNumber;
 		} 
 		printf("                                  当前各进程PCB信息                                  \n");
 		printf("﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀\n");
     for (int i = 0; i < task_count; i++) {
-        printf("任务 %s: 状态 %c, 优先级 %d\n", tasks[i].process_name, tasks[i].status, tasks[i].priority);
+        printf("\t任务 %s: 状态 %c, 优先级 %d\n", tasks[i].process_name, tasks[i].status, tasks[i].priority);
     }
-    printf("﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀\n");
+    printf("﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀﹀\n\n");
 }
 
 
